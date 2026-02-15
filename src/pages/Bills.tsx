@@ -8,13 +8,16 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Search, Zap, FileText } from 'lucide-react';
+import { Plus, Search, Zap, FileText, TrendingUp, TrendingDown } from 'lucide-react';
 import { toast } from 'sonner';
+
+const BILL_CATEGORIES = ['SPP', 'Snack', 'Kegiatan', 'Seragam', 'Buku', 'Lainnya'];
 
 export default function Bills() {
   const [bills, setBills] = useState<Bill[]>(mockBills);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterCategory, setFilterCategory] = useState<string>('all');
   const [manualDialogOpen, setManualDialogOpen] = useState(false);
   const [autoDialogOpen, setAutoDialogOpen] = useState(false);
 
@@ -25,17 +28,21 @@ export default function Bills() {
   const [billAmount, setBillAmount] = useState('');
   const [billDueDate, setBillDueDate] = useState('');
   const [billType, setBillType] = useState<'spp' | 'lainnya'>('lainnya');
+  const [billCategory, setBillCategory] = useState('Lainnya');
 
   // Auto generate form
   const [autoMonth, setAutoMonth] = useState('');
   const [autoYear, setAutoYear] = useState('2025');
   const [autoClass, setAutoClass] = useState<string>('all');
+  const [autoCategory, setAutoCategory] = useState('SPP');
+  const [autoCustomAmount, setAutoCustomAmount] = useState('');
 
   const filtered = bills.filter(b => {
     const matchSearch = b.studentName.toLowerCase().includes(search.toLowerCase()) ||
       b.title.toLowerCase().includes(search.toLowerCase());
     const matchStatus = filterStatus === 'all' || b.status === filterStatus;
-    return matchSearch && matchStatus;
+    const matchCategory = filterCategory === 'all' || (b.category || 'SPP') === filterCategory;
+    return matchSearch && matchStatus && matchCategory;
   });
 
   const handleManualSave = () => {
@@ -57,6 +64,7 @@ export default function Bills() {
       dueDate: billDueDate,
       createdAt: new Date().toISOString().split('T')[0],
       type: billType,
+      category: billCategory,
     };
     setBills(prev => [newBill, ...prev]);
     toast.success(`Tagihan untuk ${student.name} berhasil dibuat`);
@@ -66,6 +74,7 @@ export default function Bills() {
     setBillMonth('');
     setBillAmount('');
     setBillDueDate('');
+    setBillCategory('Lainnya');
   };
 
   const handleAutoGenerate = () => {
@@ -78,16 +87,28 @@ export default function Bills() {
       ? mockStudents
       : mockStudents.filter(s => s.class === autoClass);
 
-    const existingKeys = new Set(bills.map(b => `${b.studentId}-${b.month}-${b.year}-spp`));
+    const isSpp = autoCategory === 'SPP';
+    const categoryKey = autoCategory.toLowerCase();
+    const existingKeys = new Set(bills.map(b => `${b.studentId}-${b.month}-${b.year}-${(b.category || 'SPP').toLowerCase()}`));
     let created = 0;
 
     const newBills: Bill[] = [];
     targetStudents.forEach(student => {
-      const key = `${student.id}-${autoMonth}-${year}-spp`;
+      const key = `${student.id}-${autoMonth}-${year}-${categoryKey}`;
       if (existingKeys.has(key)) return;
 
-      const sppSetting = mockSppSettings.find(s => s.class === student.class);
-      const amount = student.customSppAmount ?? sppSetting?.monthlyAmount ?? 0;
+      let amount: number;
+      if (isSpp) {
+        const sppSetting = mockSppSettings.find(s => s.class === student.class);
+        amount = student.customSppAmount ?? sppSetting?.monthlyAmount ?? 0;
+      } else {
+        amount = parseInt(autoCustomAmount) || 0;
+        if (amount <= 0) {
+          toast.error('Masukkan jumlah tagihan yang valid');
+          return;
+        }
+      }
+
       const monthIndex = MONTHS.indexOf(autoMonth);
       const lastDay = new Date(year, monthIndex + 1, 0).getDate();
 
@@ -95,7 +116,7 @@ export default function Bills() {
         id: `b-${Date.now()}-${student.id}`,
         studentId: student.id,
         studentName: student.name,
-        title: `SPP ${autoMonth} ${year}`,
+        title: `${autoCategory} ${autoMonth} ${year}`,
         month: autoMonth,
         year,
         amount,
@@ -103,7 +124,8 @@ export default function Bills() {
         status: 'belum_lunas',
         dueDate: `${year}-${String(monthIndex + 1).padStart(2, '0')}-${lastDay}`,
         createdAt: new Date().toISOString().split('T')[0],
-        type: 'spp',
+        type: isSpp ? 'spp' : 'lainnya',
+        category: autoCategory,
       });
       created++;
     });
@@ -112,7 +134,7 @@ export default function Bills() {
       toast.info('Semua tagihan untuk bulan ini sudah ada');
     } else {
       setBills(prev => [...newBills, ...prev]);
-      toast.success(`${created} tagihan SPP ${autoMonth} ${year} berhasil dibuat`);
+      toast.success(`${created} tagihan ${autoCategory} ${autoMonth} ${year} berhasil dibuat`);
     }
     setAutoDialogOpen(false);
   };
@@ -121,6 +143,7 @@ export default function Bills() {
   const totalUnpaidAmount = filtered
     .filter(b => b.status === 'belum_lunas')
     .reduce((sum, b) => sum + (b.amount - b.paidAmount), 0);
+  const totalOverpayment = filtered.reduce((sum, b) => sum + (b.overpayment || 0), 0);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -128,22 +151,34 @@ export default function Bills() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Tagihan</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {totalUnpaid} tagihan belum lunas · Rp {totalUnpaidAmount.toLocaleString('id-ID')}
+            {totalUnpaid} belum lunas · Rp {totalUnpaidAmount.toLocaleString('id-ID')}
+            {totalOverpayment > 0 && (
+              <span className="text-primary"> · Kelebihan: Rp {totalOverpayment.toLocaleString('id-ID')}</span>
+            )}
           </p>
         </div>
         <div className="flex gap-2">
           <Dialog open={autoDialogOpen} onOpenChange={setAutoDialogOpen}>
             <DialogTrigger asChild>
-              <Button variant="outline"><Zap className="w-4 h-4 mr-2" /> Generate SPP</Button>
+              <Button variant="outline"><Zap className="w-4 h-4 mr-2" /> Generate Tagihan</Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Generate Tagihan SPP Otomatis</DialogTitle>
+                <DialogTitle>Generate Tagihan Otomatis</DialogTitle>
               </DialogHeader>
               <p className="text-sm text-muted-foreground">
-                Buat tagihan SPP bulanan untuk semua siswa sekaligus. Tarif menggunakan pengaturan per kelas, atau tarif kustom jika diatur per siswa.
+                Buat tagihan bulanan untuk semua siswa sekaligus. Pilih kategori (SPP, Snack, dll) dan jumlahnya.
               </p>
               <div className="grid gap-4 py-2">
+                <div className="space-y-2">
+                  <Label>Kategori Tagihan</Label>
+                  <Select value={autoCategory} onValueChange={setAutoCategory}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {BILL_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Bulan</Label>
@@ -159,6 +194,18 @@ export default function Bills() {
                     <Input value={autoYear} onChange={e => setAutoYear(e.target.value)} type="number" />
                   </div>
                 </div>
+                {autoCategory !== 'SPP' && (
+                  <div className="space-y-2">
+                    <Label>Jumlah per Siswa (Rp)</Label>
+                    <Input 
+                      type="number" 
+                      value={autoCustomAmount} 
+                      onChange={e => setAutoCustomAmount(e.target.value)} 
+                      placeholder="Misal: 25000 untuk snack" 
+                    />
+                    <p className="text-xs text-muted-foreground">Jumlah bisa berbeda tiap bulan sesuai kebutuhan</p>
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label>Filter Kelas</Label>
                   <Select value={autoClass} onValueChange={setAutoClass}>
@@ -198,27 +245,26 @@ export default function Bills() {
                 </div>
                 <div className="space-y-2">
                   <Label>Judul Tagihan</Label>
-                  <Input value={billTitle} onChange={e => setBillTitle(e.target.value)} placeholder="Mis: Biaya Kegiatan, SPP Tambahan..." />
+                  <Input value={billTitle} onChange={e => setBillTitle(e.target.value)} placeholder="Mis: Snack Maret, Biaya Kegiatan..." />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Jenis</Label>
-                    <Select value={billType} onValueChange={v => setBillType(v as 'spp' | 'lainnya')}>
+                    <Label>Kategori</Label>
+                    <Select value={billCategory} onValueChange={setBillCategory}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="spp">SPP</SelectItem>
-                        <SelectItem value="lainnya">Lainnya</SelectItem>
+                        {BILL_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
                     <Label>Jumlah (Rp)</Label>
-                    <Input type="number" value={billAmount} onChange={e => setBillAmount(e.target.value)} placeholder="350000" />
+                    <Input type="number" value={billAmount} onChange={e => setBillAmount(e.target.value)} placeholder="25000" />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Bulan (opsional)</Label>
+                    <Label>Bulan</Label>
                     <Select value={billMonth} onValueChange={setBillMonth}>
                       <SelectTrigger><SelectValue placeholder="Pilih" /></SelectTrigger>
                       <SelectContent>
@@ -244,13 +290,18 @@ export default function Bills() {
           <Input className="pl-9" placeholder="Cari nama siswa atau tagihan..." value={search} onChange={e => setSearch(e.target.value)} />
         </div>
         <Select value={filterStatus} onValueChange={setFilterStatus}>
-          <SelectTrigger className="w-40">
-            <SelectValue />
-          </SelectTrigger>
+          <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Semua Status</SelectItem>
             <SelectItem value="belum_lunas">Belum Lunas</SelectItem>
             <SelectItem value="lunas">Lunas</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={filterCategory} onValueChange={setFilterCategory}>
+          <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Semua Kategori</SelectItem>
+            {BILL_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
@@ -265,7 +316,7 @@ export default function Bills() {
                   <TableHead>Tagihan</TableHead>
                   <TableHead>Jumlah</TableHead>
                   <TableHead className="hidden md:table-cell">Terbayar</TableHead>
-                  <TableHead className="hidden md:table-cell">Sisa</TableHead>
+                  <TableHead className="hidden md:table-cell">Sisa/Lebih</TableHead>
                   <TableHead className="hidden md:table-cell">Jatuh Tempo</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
@@ -273,6 +324,7 @@ export default function Bills() {
               <TableBody>
                 {filtered.map(bill => {
                   const remaining = bill.amount - bill.paidAmount;
+                  const overpay = bill.overpayment || 0;
                   return (
                     <TableRow key={bill.id}>
                       <TableCell className="font-medium">{bill.studentName}</TableCell>
@@ -280,8 +332,8 @@ export default function Bills() {
                         <div className="flex items-center gap-2">
                           <FileText className="w-3.5 h-3.5 text-muted-foreground" />
                           <span className="text-sm">{bill.title}</span>
-                          {bill.type === 'lainnya' && (
-                            <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">Lainnya</span>
+                          {(bill.category && bill.category !== 'SPP') && (
+                            <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{bill.category}</span>
                           )}
                         </div>
                       </TableCell>
@@ -289,8 +341,18 @@ export default function Bills() {
                       <TableCell className="hidden md:table-cell text-muted-foreground">
                         Rp {bill.paidAmount.toLocaleString('id-ID')}
                       </TableCell>
-                      <TableCell className="hidden md:table-cell font-medium">
-                        {remaining > 0 ? `Rp ${remaining.toLocaleString('id-ID')}` : '-'}
+                      <TableCell className="hidden md:table-cell">
+                        {overpay > 0 ? (
+                          <span className="flex items-center gap-1 text-primary font-medium">
+                            <TrendingUp className="w-3.5 h-3.5" />
+                            +Rp {overpay.toLocaleString('id-ID')}
+                          </span>
+                        ) : remaining > 0 ? (
+                          <span className="flex items-center gap-1 text-warning font-medium">
+                            <TrendingDown className="w-3.5 h-3.5" />
+                            Rp {remaining.toLocaleString('id-ID')}
+                          </span>
+                        ) : '-'}
                       </TableCell>
                       <TableCell className="hidden md:table-cell text-muted-foreground">{bill.dueDate}</TableCell>
                       <TableCell>
