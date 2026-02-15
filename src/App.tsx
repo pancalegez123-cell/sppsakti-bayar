@@ -9,6 +9,7 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Students from "./pages/Students";
 import Payments from "./pages/Payments";
+import Bills from "./pages/Bills";
 import PaymentHistory from "./pages/PaymentHistory";
 import Reports from "./pages/Reports";
 import SettingsPage from "./pages/Settings";
@@ -28,6 +29,7 @@ const App = () => (
             <Route path="/dashboard" element={<AppLayout><Dashboard /></AppLayout>} />
             <Route path="/students" element={<AppLayout><Students /></AppLayout>} />
             <Route path="/payments" element={<AppLayout><Payments /></AppLayout>} />
+            <Route path="/bills" element={<AppLayout><Bills /></AppLayout>} />
             <Route path="/history" element={<AppLayout><PaymentHistory /></AppLayout>} />
             <Route path="/reports" element={<AppLayout><Reports /></AppLayout>} />
             <Route path="/settings" element={<AppLayout><SettingsPage /></AppLayout>} />
