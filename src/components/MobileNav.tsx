@@ -1,11 +1,11 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { LayoutDashboard, Users, CreditCard, History, FileText } from 'lucide-react';
+import { LayoutDashboard, Users, CreditCard, History, FileText, Receipt } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
   { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, roles: ['admin', 'bendahara', 'wali'] },
-  { label: 'Siswa', path: '/students', icon: Users, roles: ['admin', 'bendahara'] },
+  { label: 'Tagihan', path: '/bills', icon: Receipt, roles: ['admin', 'bendahara'] },
   { label: 'Bayar', path: '/payments', icon: CreditCard, roles: ['admin', 'bendahara'] },
   { label: 'Riwayat', path: '/history', icon: History, roles: ['admin', 'bendahara', 'wali'] },
   { label: 'Laporan', path: '/reports', icon: FileText, roles: ['admin', 'bendahara'] },

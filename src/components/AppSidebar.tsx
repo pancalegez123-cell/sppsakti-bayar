@@ -6,6 +6,7 @@ import {
   CreditCard,
   History,
   FileText,
+  BarChart3,
   Settings,
   LogOut,
   GraduationCap,
@@ -20,9 +21,10 @@ import { ROLE_LABELS } from '@/types/spp';
 const navItems = [
   { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, roles: ['admin', 'bendahara', 'wali'] },
   { label: 'Siswa', path: '/students', icon: Users, roles: ['admin', 'bendahara'] },
+  { label: 'Tagihan', path: '/bills', icon: FileText, roles: ['admin', 'bendahara'] },
   { label: 'Pembayaran', path: '/payments', icon: CreditCard, roles: ['admin', 'bendahara'] },
   { label: 'Riwayat', path: '/history', icon: History, roles: ['admin', 'bendahara', 'wali'] },
-  { label: 'Laporan', path: '/reports', icon: FileText, roles: ['admin', 'bendahara'] },
+  { label: 'Laporan', path: '/reports', icon: BarChart3, roles: ['admin', 'bendahara'] },
   { label: 'Pengaturan', path: '/settings', icon: Settings, roles: ['admin'] },
 ];
 

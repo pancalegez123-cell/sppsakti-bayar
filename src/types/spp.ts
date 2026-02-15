@@ -7,16 +7,7 @@ export interface User {
   role: UserRole;
 }
 
-export interface Student {
-  id: string;
-  name: string;
-  nis: string;
-  class: string;
-  academicYear: string;
-  parentName: string;
-  phone: string;
-  address: string;
-}
+// Student is defined after Bill below
 
 export interface SppSetting {
   id: string;
@@ -29,6 +20,7 @@ export interface Payment {
   id: string;
   studentId: string;
   studentName: string;
+  billId?: string;
   month: string;
   year: number;
   amount: number;
@@ -36,6 +28,33 @@ export interface Payment {
   method: 'cash' | 'transfer';
   notes: string;
   status: 'lunas' | 'belum_lunas';
+}
+
+export interface Bill {
+  id: string;
+  studentId: string;
+  studentName: string;
+  title: string;
+  month: string;
+  year: number;
+  amount: number;
+  paidAmount: number;
+  status: 'lunas' | 'belum_lunas';
+  dueDate: string;
+  createdAt: string;
+  type: 'spp' | 'lainnya';
+}
+
+export interface Student {
+  id: string;
+  name: string;
+  nis: string;
+  class: string;
+  academicYear: string;
+  parentName: string;
+  phone: string;
+  address: string;
+  customSppAmount?: number;
 }
 
 export interface DashboardStats {
