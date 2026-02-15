@@ -11,12 +11,11 @@ import {
   LogOut,
   GraduationCap,
   Menu,
-  X,
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
 import { ROLE_LABELS } from '@/types/spp';
+import ThemeToggle from '@/components/ThemeToggle';
 
 const navItems = [
   { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, roles: ['admin', 'bendahara', 'wali'] },
@@ -90,13 +89,16 @@ export default function AppSidebar() {
               <p className="text-xs text-sidebar-foreground/50">{ROLE_LABELS[user.role]}</p>
             </div>
           )}
-          <button
-            onClick={logout}
-            className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
-          >
-            <LogOut className="w-4 h-4" />
-            {!collapsed && <span>Keluar</span>}
-          </button>
+          <div className="flex items-center gap-1">
+            <ThemeToggle />
+            <button
+              onClick={logout}
+              className="flex items-center gap-3 flex-1 px-3 py-2 rounded-lg text-sm text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+              {!collapsed && <span>Keluar</span>}
+            </button>
+          </div>
         </div>
       </aside>
     </>

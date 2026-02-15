@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { mockPayments, mockStudents } from '@/data/mockData';
 import { CLASSES, MONTHS } from '@/types/spp';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Download } from 'lucide-react';
-import { toast } from 'sonner';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Download, FileSpreadsheet, FileText, File } from 'lucide-react';
+import { exportToCSV, exportToExcel, exportToPDF, exportToWord } from '@/lib/exportUtils';
 
 export default function Reports() {
   const [filterClass, setFilterClass] = useState('all');
@@ -22,23 +23,15 @@ export default function Reports() {
   const totalAmount = filtered.reduce((sum, p) => sum + p.amount, 0);
   const lunasCount = filtered.filter(p => p.status === 'lunas').length;
 
-  const handleExport = () => {
-    const headers = ['Nama Siswa', 'Bulan', 'Tahun', 'Jumlah', 'Metode', 'Tanggal', 'Status'];
-    const rows = filtered.map(p => [
-      p.studentName, p.month, p.year, p.amount,
+  const getExportData = () => ({
+    headers: ['Nama Siswa', 'Bulan', 'Tahun', 'Jumlah (Rp)', 'Metode', 'Tanggal', 'Status'],
+    rows: filtered.map(p => [
+      p.studentName, p.month, p.year, `Rp ${p.amount.toLocaleString('id-ID')}`,
       p.method === 'cash' ? 'Tunai' : 'Transfer', p.paymentDate,
       p.status === 'lunas' ? 'Lunas' : 'Belum Lunas',
-    ]);
-    const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `laporan-spp-${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success('Laporan berhasil diunduh');
-  };
+    ]),
+    title: `Laporan-SPP-${new Date().toISOString().split('T')[0]}`,
+  });
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -47,12 +40,29 @@ export default function Reports() {
           <h1 className="text-2xl font-bold text-foreground">Laporan Pembayaran</h1>
           <p className="text-sm text-muted-foreground mt-1">Filter dan ekspor data pembayaran</p>
         </div>
-        <Button onClick={handleExport} variant="outline">
-          <Download className="w-4 h-4 mr-2" /> Ekspor CSV
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline">
+              <Download className="w-4 h-4 mr-2" /> Ekspor Laporan
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => exportToExcel(getExportData())}>
+              <FileSpreadsheet className="w-4 h-4 mr-2" /> Ekspor Excel (.xls)
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => exportToCSV(getExportData())}>
+              <FileText className="w-4 h-4 mr-2" /> Ekspor CSV
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => exportToPDF(getExportData())}>
+              <File className="w-4 h-4 mr-2" /> Ekspor PDF (Print)
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => exportToWord(getExportData())}>
+              <FileText className="w-4 h-4 mr-2" /> Ekspor Word (.doc)
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
-      {/* Filters */}
       <div className="flex flex-wrap gap-4">
         <Select value={filterClass} onValueChange={setFilterClass}>
           <SelectTrigger className="w-40"><SelectValue placeholder="Semua Kelas" /></SelectTrigger>
@@ -70,7 +80,6 @@ export default function Reports() {
         </Select>
       </div>
 
-      {/* Summary */}
       <div className="grid grid-cols-3 gap-4">
         <Card className="glass-card">
           <CardContent className="p-4">
@@ -92,7 +101,6 @@ export default function Reports() {
         </Card>
       </div>
 
-      {/* Table */}
       <Card className="glass-card overflow-hidden">
         <CardContent className="p-0">
           <div className="overflow-x-auto">

@@ -43,6 +43,8 @@ export interface Bill {
   dueDate: string;
   createdAt: string;
   type: 'spp' | 'lainnya';
+  category?: string; // e.g. 'snack', 'kegiatan', 'seragam', etc.
+  overpayment?: number; // amount paid over the bill
 }
 
 export interface Student {
