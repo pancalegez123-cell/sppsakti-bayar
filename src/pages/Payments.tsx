@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { mockStudents, mockPayments, mockSppSettings } from '@/data/mockData';
 import { Payment, MONTHS } from '@/types/spp';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,8 +9,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Printer, Search } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Plus, Printer, Search, MessageCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { generateWhatsAppUrl, createPaymentMessage } from '@/lib/whatsapp';
 
 export default function Payments() {
   const [payments, setPayments] = useState<Payment[]>(mockPayments);
@@ -21,6 +23,18 @@ export default function Payments() {
   const [amount, setAmount] = useState('');
   const [method, setMethod] = useState<'cash' | 'transfer'>('cash');
   const [notes, setNotes] = useState('');
+
+  // WhatsApp notification state
+  const [waDialogOpen, setWaDialogOpen] = useState(false);
+  const [waPayment, setWaPayment] = useState<Payment | null>(null);
+  const [waToParent, setWaToParent] = useState(true);
+  const [waToAdmin, setWaToAdmin] = useState(false);
+  const [waToBendahara, setWaToBendahara] = useState(false);
+  const [waCustomPhone, setWaCustomPhone] = useState('');
+
+  // Role phone numbers (configurable)
+  const adminPhone = '081200000001';
+  const bendaharaPhone = '081200000002';
 
   const filtered = payments.filter(p =>
     p.studentName.toLowerCase().includes(search.toLowerCase()) ||
@@ -56,6 +70,41 @@ export default function Payments() {
     setMonth('');
     setAmount('');
     setNotes('');
+
+    // Open WA notification dialog
+    setWaPayment(newPayment);
+    setWaDialogOpen(true);
+  };
+
+  const handleSendWa = () => {
+    if (!waPayment) return;
+    const student = mockStudents.find(s => s.id === waPayment.studentId);
+    const message = createPaymentMessage(waPayment, student?.class);
+
+    const recipients: string[] = [];
+    if (waToParent && student?.phone) recipients.push(student.phone);
+    if (waToAdmin) recipients.push(adminPhone);
+    if (waToBendahara) recipients.push(bendaharaPhone);
+    if (waCustomPhone.trim()) recipients.push(waCustomPhone.trim());
+
+    if (recipients.length === 0) {
+      toast.error('Pilih minimal satu penerima');
+      return;
+    }
+
+    recipients.forEach(phone => {
+      window.open(generateWhatsAppUrl(phone, message), '_blank');
+    });
+
+    toast.success(`Notifikasi WhatsApp dikirim ke ${recipients.length} penerima`);
+    setWaDialogOpen(false);
+    setWaPayment(null);
+    setWaCustomPhone('');
+  };
+
+  const handleOpenWa = (payment: Payment) => {
+    setWaPayment(payment);
+    setWaDialogOpen(true);
   };
 
   const handlePrint = (payment: Payment) => {
@@ -200,9 +249,14 @@ export default function Payments() {
                       </span>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" onClick={() => handlePrint(payment)}>
-                        <Printer className="w-4 h-4" />
-                      </Button>
+                      <div className="flex items-center justify-end gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => handleOpenWa(payment)} title="Kirim notifikasi WA">
+                          <MessageCircle className="w-4 h-4 text-primary" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handlePrint(payment)}>
+                          <Printer className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -211,6 +265,54 @@ export default function Payments() {
           </div>
         </CardContent>
       </Card>
+
+      {/* WhatsApp Notification Dialog */}
+      <Dialog open={waDialogOpen} onOpenChange={setWaDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageCircle className="w-5 h-5 text-primary" />
+              Kirim Notifikasi WhatsApp
+            </DialogTitle>
+          </DialogHeader>
+          {waPayment && (
+            <div className="space-y-4 py-2">
+              <div className="p-3 rounded-lg bg-muted/50 text-sm">
+                <p className="font-medium">{waPayment.studentName}</p>
+                <p className="text-muted-foreground">{waPayment.month} {waPayment.year} · Rp {waPayment.amount.toLocaleString('id-ID')}</p>
+              </div>
+              <div className="space-y-3">
+                <Label className="text-sm font-medium">Kirim ke:</Label>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <Checkbox checked={waToParent} onCheckedChange={(c) => setWaToParent(!!c)} />
+                    <span className="text-sm">Wali Murid ({mockStudents.find(s => s.id === waPayment.studentId)?.phone || '-'})</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <Checkbox checked={waToAdmin} onCheckedChange={(c) => setWaToAdmin(!!c)} />
+                    <span className="text-sm">Admin ({adminPhone})</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <Checkbox checked={waToBendahara} onCheckedChange={(c) => setWaToBendahara(!!c)} />
+                    <span className="text-sm">Bendahara ({bendaharaPhone})</span>
+                  </label>
+                </div>
+                <div className="space-y-2">
+                  <Label>Nomor Tambahan (opsional)</Label>
+                  <Input
+                    value={waCustomPhone}
+                    onChange={e => setWaCustomPhone(e.target.value)}
+                    placeholder="08xxxxxxxxxx"
+                  />
+                </div>
+              </div>
+              <Button onClick={handleSendWa} className="w-full">
+                <MessageCircle className="w-4 h-4 mr-2" /> Kirim via WhatsApp
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

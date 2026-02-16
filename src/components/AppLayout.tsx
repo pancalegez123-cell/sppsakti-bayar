@@ -5,6 +5,7 @@ import AppSidebar from '@/components/AppSidebar';
 import MobileNav from '@/components/MobileNav';
 import { GraduationCap, LogOut } from 'lucide-react';
 import { ROLE_LABELS } from '@/types/spp';
+import ThemeToggle from '@/components/ThemeToggle';
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   const { user, isAuthenticated, logout } = useAuth();
@@ -23,8 +24,9 @@ export default function AppLayout({ children }: { children: ReactNode }) {
             </div>
             <span className="font-bold text-sm">SPP Manager</span>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">{user && ROLE_LABELS[user.role]}</span>
+            <ThemeToggle />
             <button onClick={logout} className="p-1.5 rounded-lg hover:bg-muted">
               <LogOut className="w-4 h-4 text-muted-foreground" />
             </button>

@@ -8,7 +8,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Search, Zap, FileText, TrendingUp, TrendingDown } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Plus, Search, Zap, FileText, TrendingUp, TrendingDown, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 const BILL_CATEGORIES = ['SPP', 'Snack', 'Kegiatan', 'Seragam', 'Buku', 'Lainnya'];
@@ -20,6 +21,7 @@ export default function Bills() {
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [manualDialogOpen, setManualDialogOpen] = useState(false);
   const [autoDialogOpen, setAutoDialogOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // Manual bill form
   const [selectedStudentId, setSelectedStudentId] = useState('');
@@ -44,6 +46,29 @@ export default function Bills() {
     const matchCategory = filterCategory === 'all' || (b.category || 'SPP') === filterCategory;
     return matchSearch && matchStatus && matchCategory;
   });
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filtered.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filtered.map(b => b.id)));
+    }
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedIds.size === 0) return;
+    setBills(prev => prev.filter(b => !selectedIds.has(b.id)));
+    toast.success(`${selectedIds.size} tagihan berhasil dihapus`);
+    setSelectedIds(new Set());
+  };
 
   const handleManualSave = () => {
     const student = mockStudents.find(s => s.id === selectedStudentId);
@@ -167,7 +192,7 @@ export default function Bills() {
                 <DialogTitle>Generate Tagihan Otomatis</DialogTitle>
               </DialogHeader>
               <p className="text-sm text-muted-foreground">
-                Buat tagihan bulanan untuk semua siswa sekaligus. Pilih kategori (SPP, Snack, dll) dan jumlahnya.
+                Buat tagihan bulanan untuk semua siswa sekaligus.
               </p>
               <div className="grid gap-4 py-2">
                 <div className="space-y-2">
@@ -197,13 +222,8 @@ export default function Bills() {
                 {autoCategory !== 'SPP' && (
                   <div className="space-y-2">
                     <Label>Jumlah per Siswa (Rp)</Label>
-                    <Input 
-                      type="number" 
-                      value={autoCustomAmount} 
-                      onChange={e => setAutoCustomAmount(e.target.value)} 
-                      placeholder="Misal: 25000 untuk snack" 
-                    />
-                    <p className="text-xs text-muted-foreground">Jumlah bisa berbeda tiap bulan sesuai kebutuhan</p>
+                    <Input type="number" value={autoCustomAmount} onChange={e => setAutoCustomAmount(e.target.value)} placeholder="Misal: 25000" />
+                    <p className="text-xs text-muted-foreground">Jumlah bisa berbeda tiap bulan</p>
                   </div>
                 )}
                 <div className="space-y-2">
@@ -245,7 +265,7 @@ export default function Bills() {
                 </div>
                 <div className="space-y-2">
                   <Label>Judul Tagihan</Label>
-                  <Input value={billTitle} onChange={e => setBillTitle(e.target.value)} placeholder="Mis: Snack Maret, Biaya Kegiatan..." />
+                  <Input value={billTitle} onChange={e => setBillTitle(e.target.value)} placeholder="Mis: Snack Maret" />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
@@ -284,6 +304,7 @@ export default function Bills() {
         </div>
       </div>
 
+      {/* Filters & Bulk Actions */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -304,6 +325,11 @@ export default function Bills() {
             {BILL_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
           </SelectContent>
         </Select>
+        {selectedIds.size > 0 && (
+          <Button variant="destructive" size="sm" onClick={handleBulkDelete}>
+            <Trash2 className="w-4 h-4 mr-2" /> Hapus {selectedIds.size} tagihan
+          </Button>
+        )}
       </div>
 
       <Card className="glass-card overflow-hidden">
@@ -312,6 +338,12 @@ export default function Bills() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50">
+                  <TableHead className="w-10">
+                    <Checkbox
+                      checked={filtered.length > 0 && selectedIds.size === filtered.length}
+                      onCheckedChange={toggleSelectAll}
+                    />
+                  </TableHead>
                   <TableHead>Siswa</TableHead>
                   <TableHead>Tagihan</TableHead>
                   <TableHead>Jumlah</TableHead>
@@ -326,7 +358,13 @@ export default function Bills() {
                   const remaining = bill.amount - bill.paidAmount;
                   const overpay = bill.overpayment || 0;
                   return (
-                    <TableRow key={bill.id}>
+                    <TableRow key={bill.id} className={selectedIds.has(bill.id) ? 'bg-primary/5' : ''}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedIds.has(bill.id)}
+                          onCheckedChange={() => toggleSelect(bill.id)}
+                        />
+                      </TableCell>
                       <TableCell className="font-medium">{bill.studentName}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
@@ -369,7 +407,7 @@ export default function Bills() {
                 })}
                 {filtered.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                       Belum ada tagihan
                     </TableCell>
                   </TableRow>
