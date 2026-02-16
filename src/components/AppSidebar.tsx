@@ -89,7 +89,7 @@ export default function AppSidebar() {
               <p className="text-xs text-sidebar-foreground/50">{ROLE_LABELS[user.role]}</p>
             </div>
           )}
-          <div className="flex items-center gap-1">
+        <div className={cn("flex items-center", collapsed ? "flex-col gap-1" : "gap-1")}>
             <ThemeToggle />
             <button
               onClick={logout}
