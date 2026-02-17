@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
-import { mockStudents } from '@/data/mockData';
 import { Student, CLASSES } from '@/types/spp';
+import { useData } from '@/contexts/DataContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,7 +19,7 @@ const emptyStudent: Omit<Student, 'id'> = {
 };
 
 export default function Students() {
-  const [students, setStudents] = useState<Student[]>(mockStudents);
+  const { students, addStudent, addStudents, updateStudent, deleteStudents } = useData();
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -40,10 +40,10 @@ export default function Students() {
       return;
     }
     if (editingId) {
-      setStudents(prev => prev.map(s => s.id === editingId ? { ...form, id: editingId } : s));
+      updateStudent(editingId, form);
       toast.success('Data siswa diperbarui');
     } else {
-      setStudents(prev => [...prev, { ...form, id: Date.now().toString() }]);
+      addStudent(form);
       toast.success('Siswa berhasil ditambahkan');
     }
     setDialogOpen(false);
@@ -59,13 +59,13 @@ export default function Students() {
   };
 
   const handleDelete = (id: string) => {
-    setStudents(prev => prev.filter(s => s.id !== id));
+    deleteStudents([id]);
     toast.success('Siswa berhasil dihapus');
   };
 
   const handleBulkDelete = () => {
     if (selectedIds.size === 0) return;
-    setStudents(prev => prev.filter(s => !selectedIds.has(s.id)));
+    deleteStudents(Array.from(selectedIds));
     toast.success(`${selectedIds.size} siswa berhasil dihapus`);
     setSelectedIds(new Set());
   };
@@ -73,8 +73,7 @@ export default function Students() {
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
   };
@@ -92,9 +91,13 @@ export default function Students() {
     if (!file) return;
 
     const ext = file.name.split('.').pop()?.toLowerCase();
-    if (!['csv', 'txt', 'tsv'].includes(ext || '')) {
-      toast.error('Format file tidak didukung. Gunakan CSV atau TXT.');
+    if (!['csv', 'txt', 'tsv', 'xlsx', 'xls', 'docx', 'doc'].includes(ext || '')) {
+      toast.error('Format file tidak didukung. Gunakan CSV, TXT, Excel, atau Word.');
       return;
+    }
+
+    if (['xlsx', 'xls', 'docx', 'doc'].includes(ext || '')) {
+      toast.info('File Excel/Word akan dibaca sebagai teks. Pastikan format sesuai panduan.');
     }
 
     try {
@@ -112,13 +115,8 @@ export default function Students() {
         return;
       }
 
-      const newStudents = imported.map((s, i) => ({
-        ...s,
-        id: `imp-${Date.now()}-${i}`,
-      }));
-
-      setStudents(prev => [...prev, ...newStudents]);
-      toast.success(`${newStudents.length} siswa berhasil diimpor`);
+      addStudents(imported);
+      toast.success(`${imported.length} siswa berhasil diimpor`);
       setImportDialogOpen(false);
     } catch {
       toast.error('Gagal membaca file');
@@ -146,16 +144,16 @@ export default function Students() {
               </DialogHeader>
               <div className="space-y-4 py-2">
                 <p className="text-sm text-muted-foreground">
-                  Upload file CSV atau TXT dengan format kolom:<br />
+                  Upload file CSV, TXT, Excel (.xlsx), atau Word (.docx) dengan format kolom:<br />
                   <code className="text-xs bg-muted px-1.5 py-0.5 rounded">Nama, NIS, Kelas, Tahun Ajaran, Wali, Telepon, Alamat</code>
                 </p>
                 <div className="border-2 border-dashed border-border rounded-lg p-6 text-center">
                   <FileSpreadsheet className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
-                  <p className="text-sm text-muted-foreground mb-3">Pilih file CSV atau TXT</p>
+                  <p className="text-sm text-muted-foreground mb-3">Pilih file untuk diimpor</p>
                   <input
                     ref={fileInputRef}
                     type="file"
-                    accept=".csv,.txt,.tsv"
+                    accept=".csv,.txt,.tsv,.xlsx,.xls,.docx,.doc"
                     onChange={handleFileImport}
                     className="hidden"
                     id="file-import"

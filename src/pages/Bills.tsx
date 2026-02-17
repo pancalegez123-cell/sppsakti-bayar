@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { mockStudents, mockBills, mockSppSettings } from '@/data/mockData';
 import { Bill, MONTHS, CLASSES } from '@/types/spp';
+import { useData } from '@/contexts/DataContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,9 +15,9 @@ import { toast } from 'sonner';
 const BILL_CATEGORIES = ['SPP', 'Snack', 'Kegiatan', 'Seragam', 'Buku', 'Lainnya'];
 
 export default function Bills() {
-  const [bills, setBills] = useState<Bill[]>(mockBills);
+  const { students, bills, addBill, addBills, deleteBills, sppSettings } = useData();
   const [search, setSearch] = useState('');
-  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterStatus, setFilterStatus] = useState<string>('belum_lunas');
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [manualDialogOpen, setManualDialogOpen] = useState(false);
   const [autoDialogOpen, setAutoDialogOpen] = useState(false);
@@ -65,19 +65,18 @@ export default function Bills() {
 
   const handleBulkDelete = () => {
     if (selectedIds.size === 0) return;
-    setBills(prev => prev.filter(b => !selectedIds.has(b.id)));
+    deleteBills(Array.from(selectedIds));
     toast.success(`${selectedIds.size} tagihan berhasil dihapus`);
     setSelectedIds(new Set());
   };
 
   const handleManualSave = () => {
-    const student = mockStudents.find(s => s.id === selectedStudentId);
+    const student = students.find(s => s.id === selectedStudentId);
     if (!student || !billTitle || !billAmount || !billDueDate) {
       toast.error('Lengkapi semua data tagihan');
       return;
     }
-    const newBill: Bill = {
-      id: `b-${Date.now()}`,
+    addBill({
       studentId: student.id,
       studentName: student.name,
       title: billTitle,
@@ -90,8 +89,7 @@ export default function Bills() {
       createdAt: new Date().toISOString().split('T')[0],
       type: billType,
       category: billCategory,
-    };
-    setBills(prev => [newBill, ...prev]);
+    });
     toast.success(`Tagihan untuk ${student.name} berhasil dibuat`);
     setManualDialogOpen(false);
     setSelectedStudentId('');
@@ -109,22 +107,22 @@ export default function Bills() {
     }
     const year = parseInt(autoYear) || 2025;
     const targetStudents = autoClass === 'all'
-      ? mockStudents
-      : mockStudents.filter(s => s.class === autoClass);
+      ? students
+      : students.filter(s => s.class === autoClass);
 
     const isSpp = autoCategory === 'SPP';
     const categoryKey = autoCategory.toLowerCase();
     const existingKeys = new Set(bills.map(b => `${b.studentId}-${b.month}-${b.year}-${(b.category || 'SPP').toLowerCase()}`));
     let created = 0;
 
-    const newBills: Bill[] = [];
+    const newBills: Omit<Bill, 'id'>[] = [];
     targetStudents.forEach(student => {
       const key = `${student.id}-${autoMonth}-${year}-${categoryKey}`;
       if (existingKeys.has(key)) return;
 
       let amount: number;
       if (isSpp) {
-        const sppSetting = mockSppSettings.find(s => s.class === student.class);
+        const sppSetting = sppSettings.find(s => s.class === student.class);
         amount = student.customSppAmount ?? sppSetting?.monthlyAmount ?? 0;
       } else {
         amount = parseInt(autoCustomAmount) || 0;
@@ -138,7 +136,6 @@ export default function Bills() {
       const lastDay = new Date(year, monthIndex + 1, 0).getDate();
 
       newBills.push({
-        id: `b-${Date.now()}-${student.id}`,
         studentId: student.id,
         studentName: student.name,
         title: `${autoCategory} ${autoMonth} ${year}`,
@@ -158,7 +155,7 @@ export default function Bills() {
     if (created === 0) {
       toast.info('Semua tagihan untuk bulan ini sudah ada');
     } else {
-      setBills(prev => [...newBills, ...prev]);
+      addBills(newBills);
       toast.success(`${created} tagihan ${autoCategory} ${autoMonth} ${year} berhasil dibuat`);
     }
     setAutoDialogOpen(false);
@@ -257,7 +254,7 @@ export default function Bills() {
                   <Select value={selectedStudentId} onValueChange={setSelectedStudentId}>
                     <SelectTrigger><SelectValue placeholder="Pilih siswa" /></SelectTrigger>
                     <SelectContent>
-                      {mockStudents.map(s => (
+                      {students.map(s => (
                         <SelectItem key={s.id} value={s.id}>{s.name} ({s.class})</SelectItem>
                       ))}
                     </SelectContent>
