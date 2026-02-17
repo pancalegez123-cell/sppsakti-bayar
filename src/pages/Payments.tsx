@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { mockStudents, mockPayments, mockSppSettings } from '@/data/mockData';
 import { Payment, MONTHS } from '@/types/spp';
+import { useData } from '@/contexts/DataContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,10 +15,11 @@ import { toast } from 'sonner';
 import { generateWhatsAppUrl, createPaymentMessage } from '@/lib/whatsapp';
 
 export default function Payments() {
-  const [payments, setPayments] = useState<Payment[]>(mockPayments);
+  const { students, bills, payments, addPayment, recordPaymentForBill } = useData();
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedStudentId, setSelectedStudentId] = useState('');
+  const [selectedBillId, setSelectedBillId] = useState('');
   const [month, setMonth] = useState('');
   const [amount, setAmount] = useState('');
   const [method, setMethod] = useState<'cash' | 'transfer'>('cash');
@@ -32,9 +33,13 @@ export default function Payments() {
   const [waToBendahara, setWaToBendahara] = useState(false);
   const [waCustomPhone, setWaCustomPhone] = useState('');
 
-  // Role phone numbers (configurable)
   const adminPhone = '081200000001';
   const bendaharaPhone = '081200000002';
+
+  // Get unpaid bills for selected student
+  const studentBills = selectedStudentId
+    ? bills.filter(b => b.studentId === selectedStudentId && b.status === 'belum_lunas')
+    : [];
 
   const filtered = payments.filter(p =>
     p.studentName.toLowerCase().includes(search.toLowerCase()) ||
@@ -42,43 +47,62 @@ export default function Payments() {
   );
 
   const handleSave = () => {
-    const student = mockStudents.find(s => s.id === selectedStudentId);
-    if (!student || !month || !amount) {
+    const student = students.find(s => s.id === selectedStudentId);
+    if (!student || !amount) {
       toast.error('Lengkapi semua data pembayaran');
       return;
     }
-    const sppSetting = mockSppSettings.find(s => s.class === student.class);
-    const amountNum = parseInt(amount);
-    const status = sppSetting && amountNum >= sppSetting.monthlyAmount ? 'lunas' : 'belum_lunas';
 
-    const newPayment: Payment = {
-      id: Date.now().toString(),
+    const amountNum = parseInt(amount);
+    const selectedBill = bills.find(b => b.id === selectedBillId);
+    const paymentMonth = selectedBill ? selectedBill.month : month;
+    const paymentYear = selectedBill ? selectedBill.year : 2025;
+
+    if (!paymentMonth) {
+      toast.error('Pilih bulan atau tagihan');
+      return;
+    }
+
+    const status = selectedBill
+      ? (amountNum >= (selectedBill.amount - selectedBill.paidAmount) ? 'lunas' : 'belum_lunas')
+      : 'belum_lunas';
+
+    const newPaymentData: Omit<Payment, 'id'> = {
       studentId: student.id,
       studentName: student.name,
-      month,
-      year: 2025,
+      month: paymentMonth,
+      year: paymentYear,
       amount: amountNum,
       paymentDate: new Date().toISOString().split('T')[0],
       method,
       notes,
       status,
     };
-    setPayments(prev => [newPayment, ...prev]);
-    toast.success(`Pembayaran ${student.name} berhasil dicatat`);
+
+    if (selectedBillId) {
+      recordPaymentForBill(newPaymentData, selectedBillId);
+      toast.success(`Pembayaran ${student.name} dicatat & tagihan diperbarui`);
+    } else {
+      addPayment(newPaymentData);
+      toast.success(`Pembayaran ${student.name} berhasil dicatat`);
+    }
+
+    // Create a full payment object for WA dialog
+    const fullPayment: Payment = { ...newPaymentData, id: `p-${Date.now()}`, billId: selectedBillId || undefined };
     setDialogOpen(false);
     setSelectedStudentId('');
+    setSelectedBillId('');
     setMonth('');
     setAmount('');
     setNotes('');
 
-    // Open WA notification dialog
-    setWaPayment(newPayment);
+    setWaPayment(fullPayment);
     setWaDialogOpen(true);
   };
 
   const handleSendWa = () => {
     if (!waPayment) return;
-    const student = mockStudents.find(s => s.id === waPayment.studentId);
+    const student = students.find(s => s.id === waPayment.studentId);
     const message = createPaymentMessage(waPayment, student?.class);
 
     const recipients: string[] = [];
@@ -110,7 +134,7 @@ export default function Payments() {
   const handlePrint = (payment: Payment) => {
     const receiptWindow = window.open('', '_blank');
     if (!receiptWindow) return;
-    const student = mockStudents.find(s => s.id === payment.studentId);
+    const student = students.find(s => s.id === payment.studentId);
     receiptWindow.document.write(`
       <html><head><title>Kwitansi SPP</title>
       <style>
@@ -165,25 +189,51 @@ export default function Payments() {
             <div className="grid gap-4 py-2">
               <div className="space-y-2">
                 <Label>Siswa</Label>
-                <Select value={selectedStudentId} onValueChange={setSelectedStudentId}>
+                <Select value={selectedStudentId} onValueChange={(v) => { setSelectedStudentId(v); setSelectedBillId(''); }}>
                   <SelectTrigger><SelectValue placeholder="Pilih siswa" /></SelectTrigger>
                   <SelectContent>
-                    {mockStudents.map(s => (
+                    {students.map(s => (
                       <SelectItem key={s.id} value={s.id}>{s.name} ({s.class})</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+
+              {/* Bill selection - show unpaid bills for selected student */}
+              {selectedStudentId && studentBills.length > 0 && (
                 <div className="space-y-2">
-                  <Label>Bulan</Label>
-                  <Select value={month} onValueChange={setMonth}>
-                    <SelectTrigger><SelectValue placeholder="Pilih bulan" /></SelectTrigger>
+                  <Label>Tagihan yang Dibayar</Label>
+                  <Select value={selectedBillId} onValueChange={setSelectedBillId}>
+                    <SelectTrigger><SelectValue placeholder="Pilih tagihan (opsional)" /></SelectTrigger>
                     <SelectContent>
-                      {MONTHS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                      <SelectItem value="none">Tanpa tagihan</SelectItem>
+                      {studentBills.map(b => (
+                        <SelectItem key={b.id} value={b.id}>
+                          {b.title} — Sisa Rp {(b.amount - b.paidAmount).toLocaleString('id-ID')}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                {!selectedBillId || selectedBillId === 'none' ? (
+                  <div className="space-y-2">
+                    <Label>Bulan</Label>
+                    <Select value={month} onValueChange={setMonth}>
+                      <SelectTrigger><SelectValue placeholder="Pilih bulan" /></SelectTrigger>
+                      <SelectContent>
+                        {MONTHS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label>Bulan</Label>
+                    <Input value={bills.find(b => b.id === selectedBillId)?.month || ''} disabled className="bg-muted" />
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label>Jumlah (Rp)</Label>
                   <Input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="350000" />
@@ -286,7 +336,7 @@ export default function Payments() {
                 <div className="space-y-2">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <Checkbox checked={waToParent} onCheckedChange={(c) => setWaToParent(!!c)} />
-                    <span className="text-sm">Wali Murid ({mockStudents.find(s => s.id === waPayment.studentId)?.phone || '-'})</span>
+                    <span className="text-sm">Wali Murid ({students.find(s => s.id === waPayment.studentId)?.phone || '-'})</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <Checkbox checked={waToAdmin} onCheckedChange={(c) => setWaToAdmin(!!c)} />
