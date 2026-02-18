@@ -91,7 +91,7 @@ export default function Login() {
               </Button>
             </form>
 
-            {/* Demo credentials */}
+            {/* Demo credentials - moved to Settings > Akun */}
             <div className="mt-6 p-3 rounded-lg bg-muted">
               <p className="text-xs font-semibold text-muted-foreground mb-2">Demo Akun:</p>
               <div className="space-y-1 text-xs text-muted-foreground">
