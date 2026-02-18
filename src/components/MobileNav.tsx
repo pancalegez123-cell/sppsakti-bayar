@@ -5,10 +5,10 @@ import { cn } from '@/lib/utils';
 
 const navItems = [
   { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, roles: ['admin', 'bendahara', 'wali'] },
+  { label: 'Siswa', path: '/students', icon: Users, roles: ['admin', 'bendahara'] },
   { label: 'Tagihan', path: '/bills', icon: Receipt, roles: ['admin', 'bendahara'] },
   { label: 'Bayar', path: '/payments', icon: CreditCard, roles: ['admin', 'bendahara'] },
   { label: 'Riwayat', path: '/history', icon: History, roles: ['admin', 'bendahara', 'wali'] },
-  { label: 'Laporan', path: '/reports', icon: FileText, roles: ['admin', 'bendahara'] },
 ];
 
 export default function MobileNav() {
