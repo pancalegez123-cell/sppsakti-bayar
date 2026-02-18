@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { Student, CLASSES } from '@/types/spp';
 import { useData } from '@/contexts/DataContext';
 import { Card, CardContent } from '@/components/ui/card';
@@ -9,9 +9,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Plus, Search, Pencil, Trash2, Upload, FileSpreadsheet } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { parseCSV, parseTextTable, readFileAsText } from '@/lib/fileImport';
+import ImportStudentsDialog from '@/components/ImportStudentsDialog';
 
 const emptyStudent: Omit<Student, 'id'> = {
   name: '', nis: '', class: 'VII-A', academicYear: '2024/2025',
@@ -25,8 +25,7 @@ export default function Students() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyStudent);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [importDialogOpen, setImportDialogOpen] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  
 
   const filtered = students.filter(s =>
     s.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -86,44 +85,6 @@ export default function Students() {
     }
   };
 
-  const handleFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const ext = file.name.split('.').pop()?.toLowerCase();
-    if (!['csv', 'txt', 'tsv', 'xlsx', 'xls', 'docx', 'doc'].includes(ext || '')) {
-      toast.error('Format file tidak didukung. Gunakan CSV, TXT, Excel, atau Word.');
-      return;
-    }
-
-    if (['xlsx', 'xls', 'docx', 'doc'].includes(ext || '')) {
-      toast.info('File Excel/Word akan dibaca sebagai teks. Pastikan format sesuai panduan.');
-    }
-
-    try {
-      const text = await readFileAsText(file);
-      let imported: Omit<Student, 'id'>[];
-      
-      if (ext === 'csv') {
-        imported = parseCSV(text);
-      } else {
-        imported = parseTextTable(text);
-      }
-
-      if (imported.length === 0) {
-        toast.error('Tidak ada data valid ditemukan dalam file');
-        return;
-      }
-
-      addStudents(imported);
-      toast.success(`${imported.length} siswa berhasil diimpor`);
-      setImportDialogOpen(false);
-    } catch {
-      toast.error('Gagal membaca file');
-    }
-    
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -133,38 +94,7 @@ export default function Students() {
           <p className="text-sm text-muted-foreground mt-1">{students.length} siswa terdaftar</p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          {/* Import Dialog */}
-          <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline"><Upload className="w-4 h-4 mr-2" /> Impor</Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Impor Data Siswa</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 py-2">
-                <p className="text-sm text-muted-foreground">
-                  Upload file CSV, TXT, Excel (.xlsx), atau Word (.docx) dengan format kolom:<br />
-                  <code className="text-xs bg-muted px-1.5 py-0.5 rounded">Nama, NIS, Kelas, Tahun Ajaran, Wali, Telepon, Alamat</code>
-                </p>
-                <div className="border-2 border-dashed border-border rounded-lg p-6 text-center">
-                  <FileSpreadsheet className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
-                  <p className="text-sm text-muted-foreground mb-3">Pilih file untuk diimpor</p>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".csv,.txt,.tsv,.xlsx,.xls,.docx,.doc"
-                    onChange={handleFileImport}
-                    className="hidden"
-                    id="file-import"
-                  />
-                  <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
-                    <Upload className="w-4 h-4 mr-2" /> Pilih File
-                  </Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
+          <ImportStudentsDialog />
 
           {/* Add Student Dialog */}
           <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) { setForm(emptyStudent); setEditingId(null); } }}>
