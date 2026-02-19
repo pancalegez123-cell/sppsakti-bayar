@@ -1,12 +1,33 @@
 import { createContext, useContext, useState, ReactNode, useCallback } from 'react';
-import { Student, Bill, Payment } from '@/types/spp';
+import { Student, Bill, Payment, SchoolInfo, ReceiptHeader, CLASSES } from '@/types/spp';
 import { mockStudents, mockBills, mockPayments, mockSppSettings } from '@/data/mockData';
+
+const defaultSchoolInfo: SchoolInfo = {
+  name: 'SMP Negeri 1 Contoh',
+  npsn: '12345678',
+  address: 'Jl. Pendidikan No. 1, Kota Contoh, Jawa Barat 40100',
+  phone: '022-1234567',
+  email: 'info@smpn1contoh.sch.id',
+  principal: 'Drs. Ahmad Sudrajat, M.Pd.',
+  treasurer: 'Siti Nurhaliza, S.Pd.',
+  academicYear: '2024/2025',
+};
+
+const defaultReceiptHeader: ReceiptHeader = {
+  line1: 'YAYASAN PENDIDIKAN CONTOH',
+  line2: 'SMP NEGERI 1 CONTOH',
+  line3: 'Jl. Pendidikan No. 1, Kota Contoh | Telp. 022-1234567',
+  footer: 'Kwitansi ini sah tanpa tanda tangan basah',
+};
 
 interface DataContextType {
   students: Student[];
   bills: Bill[];
   payments: Payment[];
   sppSettings: typeof mockSppSettings;
+  schoolInfo: SchoolInfo;
+  receiptHeader: ReceiptHeader;
+  classes: string[];
   // Students
   addStudent: (student: Omit<Student, 'id'>) => void;
   addStudents: (students: Omit<Student, 'id'>[]) => void;
@@ -20,6 +41,11 @@ interface DataContextType {
   // Payments
   addPayment: (payment: Omit<Payment, 'id'>) => void;
   recordPaymentForBill: (payment: Omit<Payment, 'id'>, billId: string) => void;
+  // School & Receipt
+  updateSchoolInfo: (info: SchoolInfo) => void;
+  updateReceiptHeader: (header: ReceiptHeader) => void;
+  addClass: (name: string) => void;
+  deleteClass: (name: string) => void;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -28,6 +54,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [students, setStudents] = useState<Student[]>(mockStudents);
   const [bills, setBills] = useState<Bill[]>(mockBills);
   const [payments, setPayments] = useState<Payment[]>(mockPayments);
+  const [schoolInfo, setSchoolInfo] = useState<SchoolInfo>(defaultSchoolInfo);
+  const [receiptHeader, setReceiptHeader] = useState<ReceiptHeader>(defaultReceiptHeader);
+  const [classes, setClasses] = useState<string[]>([...CLASSES]);
 
   const addStudent = useCallback((student: Omit<Student, 'id'>) => {
     setStudents(prev => [...prev, { ...student, id: `s-${Date.now()}` }]);
@@ -72,8 +101,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const recordPaymentForBill = useCallback((payment: Omit<Payment, 'id'>, billId: string) => {
     const newPayment: Payment = { ...payment, id: `p-${Date.now()}`, billId };
     setPayments(prev => [newPayment, ...prev]);
-
-    // Update the bill
     setBills(prev => prev.map(b => {
       if (b.id !== billId) return b;
       const newPaidAmount = b.paidAmount + payment.amount;
@@ -83,12 +110,19 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
+  const updateSchoolInfo = useCallback((info: SchoolInfo) => setSchoolInfo(info), []);
+  const updateReceiptHeader = useCallback((header: ReceiptHeader) => setReceiptHeader(header), []);
+  const addClass = useCallback((name: string) => setClasses(prev => prev.includes(name) ? prev : [...prev, name]), []);
+  const deleteClass = useCallback((name: string) => setClasses(prev => prev.filter(c => c !== name)), []);
+
   return (
     <DataContext.Provider value={{
       students, bills, payments, sppSettings: mockSppSettings,
+      schoolInfo, receiptHeader, classes,
       addStudent, addStudents, updateStudent, deleteStudents,
       addBill, addBills, deleteBills, updateBill,
       addPayment, recordPaymentForBill,
+      updateSchoolInfo, updateReceiptHeader, addClass, deleteClass,
     }}>
       {children}
     </DataContext.Provider>
