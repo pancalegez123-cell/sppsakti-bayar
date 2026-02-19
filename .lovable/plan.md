@@ -1,33 +1,50 @@
 
-## Impor Siswa yang Lebih Fleksibel
+## Pengaturan Akun, Akses & Profil Sekolah yang Lengkap
 
-### Masalah Saat Ini
-Parser impor saat ini cukup kaku:
-- Hanya mencocokkan header tertentu (`nama`, `nis`, `kelas`, dll.)
-- Tab-separated file tidak mendeteksi header sama sekali, langsung pakai posisi kolom
-- Tidak mendukung variasi penulisan seperti "Nama Lengkap", "No. Induk Siswa", "Nomor HP", "Kls", dll.
-- Tidak ada preview data sebelum diimpor, sehingga pengguna tidak tahu apakah kolom terbaca benar
+### Ringkasan
+Menambahkan fitur manajemen user (CRUD user + role/permission), memperkaya profil sekolah (logo upload, tahun ajaran aktif, kelola kelas), dan memindahkan semua info akun/password ke tab Pengaturan.
 
-### Yang Akan Dikerjakan
+---
 
-#### 1. Smart Header Matching
-Perluas sistem pencocokan header dengan alias yang lebih banyak dan fuzzy matching:
-- **Nama**: `nama`, `name`, `nama lengkap`, `nama siswa`, `siswa`, `student`, `full name`
-- **NIS**: `nis`, `nim`, `nisn`, `no induk`, `nomor induk`, `no. induk`, `student id`, `id siswa`
-- **Kelas**: `kelas`, `class`, `kls`, `rombel`, `rombongan belajar`, `grade`
-- **Tahun Ajaran**: `tahun`, `year`, `tahun ajaran`, `ta`, `akademik`, `academic year`
-- **Wali/Orang Tua**: `wali`, `parent`, `ortu`, `orang tua`, `nama wali`, `nama ortu`, `ayah`, `ibu`, `guardian`
-- **Telepon**: `telp`, `phone`, `hp`, `telepon`, `no hp`, `no. hp`, `no telp`, `no. telp`, `nomor hp`, `wa`, `whatsapp`, `kontak`, `contact`
-- **Alamat**: `alamat`, `address`, `domisili`, `tempat tinggal`
+### Fitur 1: Manajemen User & Akses (Tab baru "Pengguna")
 
-#### 2. Otomatis Deteksi Separator
-Deteksi otomatis apakah file menggunakan koma, tab, titik koma (`;`), atau pipe (`|`) sebagai pemisah kolom.
+**Hanya admin yang bisa mengakses tab ini.**
 
-#### 3. Preview Sebelum Impor
-Setelah file dipilih, tampilkan tabel preview 5 baris pertama agar pengguna bisa melihat apakah kolom terbaca dengan benar sebelum menekan tombol "Impor".
+- Tabel daftar user: Nama, Email, Role, Aksi (Edit/Hapus/Reset Password)
+- Tombol "Tambah User" membuka dialog dengan form: Nama, Email, Password, Role (dropdown: Admin / Bendahara / Operator)
+- Edit user: ubah nama, email, role
+- Hapus user: konfirmasi dengan AlertDialog
+- Reset password: generate password baru dan tampilkan ke admin
+- Role baru "Operator" ditambahkan -- hanya bisa akses halaman Siswa (input data siswa saja)
 
-#### 4. Mapping Kolom Manual (Fallback)
-Jika header tidak dikenali otomatis, tampilkan dropdown untuk setiap kolom yang terdeteksi agar pengguna bisa menentukan sendiri kolom mana yang berisi Nama, NIS, Kelas, dll.
+**Perubahan terkait:**
+- `src/types/spp.ts` -- tambah `'operator'` ke `UserRole`, update `ROLE_LABELS`
+- `src/contexts/AuthContext.tsx` -- tambah state `users[]` yang bisa di-CRUD, tambah fungsi `addUser`, `updateUser`, `deleteUser`, `resetPassword`. Tambah mock user operator
+- `src/components/AppSidebar.tsx` dan `src/components/MobileNav.tsx` -- tambah role `'operator'` ke menu Siswa
+- `src/pages/Settings.tsx` -- tambah tab "Pengguna" dengan tabel dan dialog CRUD
+
+---
+
+### Fitur 2: Profil Sekolah Diperkaya (Tab "Sekolah")
+
+Menambahkan field baru ke tab Sekolah yang sudah ada:
+
+- **Logo Sekolah**: upload gambar (disimpan sebagai base64/data URL di state, ditampilkan di preview kop kwitansi)
+- **Tahun Ajaran Aktif**: input text (misalnya "2024/2025"), disimpan di SchoolInfo
+- **Manajemen Kelas**: daftar kelas yang bisa ditambah/hapus (menggantikan konstanta `CLASSES` yang hardcoded)
+
+**Perubahan terkait:**
+- `src/pages/Settings.tsx` -- tambah field logo (input file + preview), tahun ajaran aktif, dan bagian kelola kelas di tab "Sekolah"
+- `src/types/spp.ts` -- `CLASSES` tetap sebagai default, tapi kelas sekarang bisa dikelola via state
+- `src/contexts/DataContext.tsx` -- tambah state `classes` dan `schoolInfo` + fungsi `addClass`, `deleteClass`, `updateSchoolInfo` agar bisa dipakai di seluruh aplikasi (misalnya kop kwitansi saat cetak)
+- Tab "Kwitansi" -- preview kop kwitansi menampilkan logo jika ada
+
+---
+
+### Fitur 3: Pindahkan Info Login & Password ke Pengaturan
+
+- Info demo akun dan form ganti password sudah ada di tab "Akun" -- ini dipertahankan
+- Pastikan tab "Akun" juga menampilkan role user yang sedang login (read-only)
 
 ---
 
@@ -35,16 +52,25 @@ Jika header tidak dikenali otomatis, tampilkan dropdown untuk setiap kolom yang 
 
 **File yang diubah:**
 
-- `src/lib/fileImport.ts`
-  - Tambah konstanta `HEADER_ALIASES` berisi mapping field ke daftar alias
-  - Buat fungsi `detectSeparator(text)` untuk mendeteksi separator otomatis (`,`, `\t`, `;`, `|`)
-  - Buat fungsi `matchHeader(header, aliases)` yang mencocokkan header dengan skor kecocokan
-  - Update `parseCSV` dan `parseTextTable` jadi satu fungsi `parseImportFile(text)` yang lebih cerdas
-  - Tambah fungsi `previewImport(text)` yang mengembalikan headers terdeteksi + 5 baris pertama + mapping kolom yang disarankan
+| File | Perubahan |
+|------|-----------|
+| `src/types/spp.ts` | Tambah `'operator'` ke `UserRole`, update `ROLE_LABELS`, tambah interface `SchoolInfo` |
+| `src/contexts/AuthContext.tsx` | Tambah state `users[]`, fungsi `addUser`, `updateUser`, `deleteUser`, `resetPassword`. Expose via context |
+| `src/contexts/DataContext.tsx` | Tambah state `classes[]`, `schoolInfo`, `receiptHeader`. Fungsi `addClass`, `deleteClass`, `updateSchoolInfo`, `updateReceiptHeader` |
+| `src/pages/Settings.tsx` | Refactor besar: tambah tab "Pengguna" (tabel user + dialog CRUD), perkaya tab "Sekolah" (logo, tahun ajaran, kelola kelas), update preview kwitansi dengan logo |
+| `src/components/AppSidebar.tsx` | Tambah `'operator'` ke roles menu Siswa |
+| `src/components/MobileNav.tsx` | Tambah `'operator'` ke roles menu Siswa |
 
-- `src/pages/Students.tsx`
-  - Tambah state `previewData` untuk menyimpan hasil preview
-  - Tambah state `columnMapping` untuk mapping kolom manual
-  - Setelah file dipilih, tampilkan tabel preview + dropdown mapping kolom
-  - Tombol "Impor" baru aktif setelah preview ditampilkan
-  - Pengguna bisa koreksi mapping kolom sebelum impor final
+**Struktur role & permission:**
+
+| Menu | Admin | Bendahara | Operator | Wali |
+|------|-------|-----------|----------|------|
+| Dashboard | Ya | Ya | Tidak | Ya |
+| Siswa | Ya | Ya | Ya | Tidak |
+| Tagihan | Ya | Ya | Tidak | Tidak |
+| Pembayaran | Ya | Ya | Tidak | Tidak |
+| Riwayat | Ya | Ya | Tidak | Ya |
+| Laporan | Ya | Ya | Tidak | Tidak |
+| Pengaturan | Ya | Tidak | Tidak | Tidak |
+
+**Catatan:** Semua data masih disimpan di state (mock/in-memory). Belum ada backend/database. Jika nanti ingin menyimpan ke Supabase, arsitektur context ini sudah siap untuk dimigrasi.
