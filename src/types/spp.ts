@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'bendahara' | 'wali';
+export type UserRole = 'admin' | 'bendahara' | 'operator' | 'wali';
 
 export interface User {
   id: string;
@@ -43,8 +43,8 @@ export interface Bill {
   dueDate: string;
   createdAt: string;
   type: 'spp' | 'lainnya';
-  category?: string; // e.g. 'snack', 'kegiatan', 'seragam', etc.
-  overpayment?: number; // amount paid over the bill
+  category?: string;
+  overpayment?: number;
 }
 
 export interface Student {
@@ -57,6 +57,25 @@ export interface Student {
   phone: string;
   address: string;
   customSppAmount?: number;
+}
+
+export interface SchoolInfo {
+  name: string;
+  npsn: string;
+  address: string;
+  phone: string;
+  email: string;
+  principal: string;
+  treasurer: string;
+  academicYear: string;
+  logo?: string;
+}
+
+export interface ReceiptHeader {
+  line1: string;
+  line2: string;
+  line3: string;
+  footer: string;
 }
 
 export interface DashboardStats {
@@ -78,5 +97,6 @@ export const CLASSES = [
 export const ROLE_LABELS: Record<UserRole, string> = {
   admin: 'Administrator',
   bendahara: 'Bendahara',
+  operator: 'Operator',
   wali: 'Wali Murid / Siswa',
 };
