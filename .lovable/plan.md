@@ -1,76 +1,80 @@
 
-## Pengaturan Akun, Akses & Profil Sekolah yang Lengkap
+Status saat ini: belum ada database yang sesungguhnya.
 
-### Ringkasan
-Menambahkan fitur manajemen user (CRUD user + role/permission), memperkaya profil sekolah (logo upload, tahun ajaran aktif, kelola kelas), dan memindahkan semua info akun/password ke tab Pengaturan.
+Dari kode yang ada:
+- `src/contexts/AuthContext.tsx` menyimpan user dan password di `useState`
+- `src/contexts/DataContext.tsx` menyimpan siswa, tagihan, pembayaran, profil sekolah, dan kelas di `useState`
+- pencarian kode juga tidak menunjukkan integrasi Supabase
+- jadi data sekarang bersifat in-memory/mock, akan hilang saat refresh browser atau buka ulang aplikasi
 
----
+Artinya:
+- Belum ada database lokal
+- Belum ada database Supabase
+- Belum ada penyimpanan permanen untuk data aplikasi
 
-### Fitur 1: Manajemen User & Akses (Tab baru "Pengguna")
+Bisa pakai database lokal?
+Ya, bisa, dengan 2 pendekatan:
 
-**Hanya admin yang bisa mengakses tab ini.**
+1. LocalStorage
+- Cocok untuk aplikasi sederhana
+- Implementasi cepat
+- Data tetap ada setelah refresh
+- Tapi kurang cocok untuk data yang mulai banyak, relasi kompleks, multi-user, dan sinkronisasi antar perangkat
 
-- Tabel daftar user: Nama, Email, Role, Aksi (Edit/Hapus/Reset Password)
-- Tombol "Tambah User" membuka dialog dengan form: Nama, Email, Password, Role (dropdown: Admin / Bendahara / Operator)
-- Edit user: ubah nama, email, role
-- Hapus user: konfirmasi dengan AlertDialog
-- Reset password: generate password baru dan tampilkan ke admin
-- Role baru "Operator" ditambahkan -- hanya bisa akses halaman Siswa (input data siswa saja)
+2. IndexedDB
+- Lebih kuat daripada localStorage
+- Cocok untuk data lokal/offline yang lebih besar
+- Tapi lebih kompleks
+- Tetap hanya tersimpan di perangkat/browser tertentu
 
-**Perubahan terkait:**
-- `src/types/spp.ts` -- tambah `'operator'` ke `UserRole`, update `ROLE_LABELS`
-- `src/contexts/AuthContext.tsx` -- tambah state `users[]` yang bisa di-CRUD, tambah fungsi `addUser`, `updateUser`, `deleteUser`, `resetPassword`. Tambah mock user operator
-- `src/components/AppSidebar.tsx` dan `src/components/MobileNav.tsx` -- tambah role `'operator'` ke menu Siswa
-- `src/pages/Settings.tsx` -- tambah tab "Pengguna" dengan tabel dan dialog CRUD
+Catatan penting:
+“database lokal” di aplikasi web frontend seperti ini biasanya bukan MySQL/Postgres lokal, melainkan penyimpanan browser seperti localStorage atau IndexedDB.
 
----
+Bisa pakai Supabase?
+Ya, sangat bisa, dan ini justru opsi yang lebih tepat kalau aplikasi ini mau dipakai sungguhan.
 
-### Fitur 2: Profil Sekolah Diperkaya (Tab "Sekolah")
+Kelebihan Supabase:
+- Data tersimpan permanen di cloud
+- Bisa dipakai di banyak perangkat
+- Cocok untuk login yang aman
+- Bisa simpan tabel: users, roles, students, bills, payments, school_profile, classes, receipt_settings
+- Mudah untuk backup, laporan, dan ekspor ke depan
 
-Menambahkan field baru ke tab Sekolah yang sudah ada:
+Rekomendasi saya:
+- Jika tujuan Anda hanya demo/prototipe cepat: pakai localStorage dulu
+- Jika tujuan Anda aplikasi operasional sekolah: langsung pakai Supabase
 
-- **Logo Sekolah**: upload gambar (disimpan sebagai base64/data URL di state, ditampilkan di preview kop kwitansi)
-- **Tahun Ajaran Aktif**: input text (misalnya "2024/2025"), disimpan di SchoolInfo
-- **Manajemen Kelas**: daftar kelas yang bisa ditambah/hapus (menggantikan konstanta `CLASSES` yang hardcoded)
+Saran arsitektur untuk project ini:
+- Auth: pindahkan login dari mock `AuthContext` ke Supabase Auth
+- Roles: buat tabel terpisah `user_roles` untuk admin / bendahara / operator
+- Data utama: simpan siswa, tagihan, pembayaran, profil sekolah, kelas di tabel Supabase
+- Logo sekolah: simpan di Supabase Storage
+- Pengaturan kop kwitansi: simpan di tabel settings/profile sekolah
 
-**Perubahan terkait:**
-- `src/pages/Settings.tsx` -- tambah field logo (input file + preview), tahun ajaran aktif, dan bagian kelola kelas di tab "Sekolah"
-- `src/types/spp.ts` -- `CLASSES` tetap sebagai default, tapi kelas sekarang bisa dikelola via state
-- `src/contexts/DataContext.tsx` -- tambah state `classes` dan `schoolInfo` + fungsi `addClass`, `deleteClass`, `updateSchoolInfo` agar bisa dipakai di seluruh aplikasi (misalnya kop kwitansi saat cetak)
-- Tab "Kwitansi" -- preview kop kwitansi menampilkan logo jika ada
+Kalau Anda ingin saya implementasikan, saya sarankan pilih salah satu jalur ini:
 
----
+Opsi A — Simpan lokal dulu
+- ubah semua context agar persist ke `localStorage`
+- hasilnya cepat, ringan, tanpa backend
+- cocok untuk uji coba internal
 
-### Fitur 3: Pindahkan Info Login & Password ke Pengaturan
+Opsi B — Migrasi ke Supabase
+- buat schema database
+- setup auth + role permission
+- migrasikan data mock ke tabel
+- ubah context agar baca/tulis ke Supabase
+- ini paling siap dipakai sungguhan
 
-- Info demo akun dan form ganti password sudah ada di tab "Akun" -- ini dipertahankan
-- Pastikan tab "Akun" juga menampilkan role user yang sedang login (read-only)
+Prioritas terbaik untuk aplikasi Anda menurut saya:
+1. Supabase Auth
+2. tabel `user_roles`
+3. tabel `school_profiles`
+4. tabel `classes`
+5. tabel `students`
+6. tabel `bills`
+7. tabel `payments`
+8. storage untuk logo sekolah
 
----
-
-### Detail Teknis
-
-**File yang diubah:**
-
-| File | Perubahan |
-|------|-----------|
-| `src/types/spp.ts` | Tambah `'operator'` ke `UserRole`, update `ROLE_LABELS`, tambah interface `SchoolInfo` |
-| `src/contexts/AuthContext.tsx` | Tambah state `users[]`, fungsi `addUser`, `updateUser`, `deleteUser`, `resetPassword`. Expose via context |
-| `src/contexts/DataContext.tsx` | Tambah state `classes[]`, `schoolInfo`, `receiptHeader`. Fungsi `addClass`, `deleteClass`, `updateSchoolInfo`, `updateReceiptHeader` |
-| `src/pages/Settings.tsx` | Refactor besar: tambah tab "Pengguna" (tabel user + dialog CRUD), perkaya tab "Sekolah" (logo, tahun ajaran, kelola kelas), update preview kwitansi dengan logo |
-| `src/components/AppSidebar.tsx` | Tambah `'operator'` ke roles menu Siswa |
-| `src/components/MobileNav.tsx` | Tambah `'operator'` ke roles menu Siswa |
-
-**Struktur role & permission:**
-
-| Menu | Admin | Bendahara | Operator | Wali |
-|------|-------|-----------|----------|------|
-| Dashboard | Ya | Ya | Tidak | Ya |
-| Siswa | Ya | Ya | Ya | Tidak |
-| Tagihan | Ya | Ya | Tidak | Tidak |
-| Pembayaran | Ya | Ya | Tidak | Tidak |
-| Riwayat | Ya | Ya | Tidak | Ya |
-| Laporan | Ya | Ya | Tidak | Tidak |
-| Pengaturan | Ya | Tidak | Tidak | Tidak |
-
-**Catatan:** Semua data masih disimpan di state (mock/in-memory). Belum ada backend/database. Jika nanti ingin menyimpan ke Supabase, arsitektur context ini sudah siap untuk dimigrasi.
+Kalau Anda pilih Supabase, ada satu hal penting yang perlu dipastikan dulu:
+apakah Anda ingin menyimpan data profil user juga, seperti nama, role, dan preferensi akun, selain data login?
+Karena itu akan menentukan struktur tabel auth/profiles yang dipakai saat implementasi nanti.
